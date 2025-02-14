@@ -1,41 +1,70 @@
-# Deno Audio Event Detector
+# 🎧 Deno Audio Event Detector
 
-This project is a generic audio event detector built with Deno, TypeScript, and TensorFlow.js. While the focus of the application is to detect dog barks, the design is generic enough to be extended for detecting other audio events (e.g., bird calls).
+🐕 A smart audio detection system built with Deno, TypeScript, and TensorFlow.js. While initially designed for detecting dog barks, this flexible system can be extended to detect various audio events like bird calls 🐦 or other sounds.
 
-This project uses remote imports so that you don't have to manage dependencies locally. It processes an RTSP stream using FFmpeg and logs detection events with timestamps.
+This project leverages remote imports for hassle-free dependency management and uses FFmpeg to process RTSP streams, logging detection events with precise timestamps.
 
-## Features
+## ✨ Features
 
-- **RTSP Stream Processing:**  
-  Captures audio from a CCTV camera using FFmpeg.
+- 📹 **RTSP Stream Processing:**  
+  Seamlessly captures audio from CCTV cameras using FFmpeg.
   
-- **Generic Audio Event Detection:**  
-  Uses a dummy TensorFlow.js-based function to detect audio events. Currently, it “detects” dog barks when the audio meets a simple threshold condition.
+- 🔍 **Generic Audio Event Detection:**  
+  Utilizes TensorFlow.js for audio event detection, currently configured for dog bark detection using threshold-based analysis.
   
-- **Event Logging:**  
-  Logs detections with timestamps to `logs/detections.log`.
+- 📝 **Event Logging:**  
+  Automatically logs detections with timestamps to `logs/detections.log`.
 
-- **Dev Container:**  
-  Includes a VS Code dev container configuration for an easy development environment.
+- 🐳 **Dev Container:**  
+  Includes VS Code dev container configuration for a consistent development experience.
 
-- **Named Volume:**  
-  Uses a Docker named volume (`detections_volume`) to persist the logs between container restarts.
+- 💾 **Named Volume:**  
+  Implements Docker named volume (`detections_volume`) for persistent log storage between container restarts.
 
-- **Remote Imports:**  
-  All dependencies are imported remotely.
+- 🔄 **Remote Imports:**  
+  Simplifies dependency management with remote imports.
 
-## Prerequisites
+## 🔧 Prerequisites
 
-- [Docker](https://www.docker.com/get-started)
-- [VS Code](https://code.visualstudio.com/) (if using the dev container)
-- [FFmpeg](https://ffmpeg.org/) (must be available in the container or on your host)
+- 🐳 [Docker](https://www.docker.com/get-started)
+- 💻 [VS Code](https://code.visualstudio.com/) (for dev container usage)
+- 🎥 [FFmpeg](https://ffmpeg.org/) (required in container or host)
 
-## Setup
+## 🚀 Setup
 
 1. **Clone the Repository:**
-
    ```bash
    git clone https://github.com/your-username/deno-audio-event-detector.git
    cd deno-audio-event-detector
+   ```
 
-# RTSP-audio-analyser
+## ▶️ Running the Script
+
+You can run the script in two ways:
+
+### 1. Using Docker (Recommended)
+```bash
+# Build and run the container
+docker compose up --build
+
+# To run in detached mode
+docker compose up -d
+```
+
+### 2. Direct Execution
+If you have Deno installed locally, you can run the script directly:
+```bash
+deno run --allow-env --allow-run --allow-net --allow-read --allow-write src/app.ts
+```
+
+### Required Permissions Explained:
+- `--allow-env`: Access environment variables
+- `--allow-run`: Execute FFmpeg commands
+- `--allow-net`: Process RTSP streams
+- `--allow-read`: Read configuration files
+- `--allow-write`: Write to log files
+
+### 📊 Monitoring
+- Check the logs folder for detection events: `logs/detections.log`
+- View real-time console output for debugging information
+- Monitor Docker container status with `docker ps` if running in container mode
