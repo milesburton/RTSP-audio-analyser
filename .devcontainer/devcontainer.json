@@ -1,0 +1,40 @@
+{
+  "name": "Deno Audio Event Detector",
+  "remoteUser": "deno",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "runArgs": [
+    "--volume",
+    "detections_volume:/app/logs"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "fish",
+        "deno.path": "/home/deno/.deno/bin/deno"
+      },
+      "extensions": [
+        "denoland.vscode-deno",
+        "redhat.vscode-json",
+        "foxundermoon.shell-format",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "skyapps.fish-vscode",
+        "redhat.vscode-yaml",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  },
+  "postCreateCommand": "deno run --allow-env --allow-run --allow-net --allow-read --allow-write src/app.ts",
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.ssh",
+      "target": "/home/bun/.ssh",
+      "type": "bind"
+    }
+  ],
+}
