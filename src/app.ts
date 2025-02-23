@@ -214,7 +214,6 @@ try {
 
 // Start processing
 try {
-  await tfReady(); // Ensure TF backend is initialized
   const model = await loadModel(modelConfig);
   await processStream(model);
 } catch (error) {

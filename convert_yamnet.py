@@ -31,15 +31,15 @@ wrapped_model = YAMNetWrapper(yamnet_model)
 # Save with the correct signature
 print("Saving model in SavedModel format...")
 tf.saved_model.save(
-    wrapped_model, 
+    wrapped_model,
     f'{base_dir}/yamnet_tf',
     signatures=wrapped_model.call
 )
 
-# Verify the signatures
-print("Verifying model signatures...")
+# Load the SavedModel and inspect signatures
+print("Loading SavedModel and inspecting signatures...")
 loaded = tf.saved_model.load(f'{base_dir}/yamnet_tf')
-print("Available signatures:", list(loaded.signatures.keys()))
+print(f"Signatures: {loaded.signatures}")
 
 # Convert to TFJS format
 print("Converting to TFJS format...")
