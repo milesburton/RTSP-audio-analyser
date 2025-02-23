@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shellcheck \
     tree \
     ruby \
+    ssh \
     build-essential \
     libssl-dev \
     && gem install lolcat \
