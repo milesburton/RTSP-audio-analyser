@@ -1,14 +1,9 @@
-import * as tf from "https://esm.sh/@tensorflow/tfjs@4.17.0";
-import "https://esm.sh/@tensorflow/tfjs-backend-cpu@4.17.0";
 import { DetectionResult, ModelConfig } from "./types.ts";
 import { loadConfig } from "./config.ts";
-import logger, { 
-  logAudioPreprocess, 
-  logModelLoading, 
-  logClassification, 
-  logError 
-} from "./pino-logger.ts";
+import logger from "./pino-logger.ts";
 import { getErrorMessage } from "./error-utils.ts";
+import { logSuccess, logError, logInfo } from "./boxen-logger.ts";
+import { tf } from "./deps.ts";
 
 async function loadModel(config: ModelConfig): Promise<tf.GraphModel> {
   // Try multiple possible paths for the model
@@ -22,6 +17,11 @@ async function loadModel(config: ModelConfig): Promise<tf.GraphModel> {
   
   let lastError = null;
   
+  logInfo(
+    `Attempting to load YAMNet model from multiple possible locations.\nThis may take a moment...`,
+    "MODEL LOADING"
+  );
+  
   // Try each path in order
   for (const path of possiblePaths) {
     try {
@@ -29,37 +29,47 @@ async function loadModel(config: ModelConfig): Promise<tf.GraphModel> {
         ? path 
         : new URL(path, import.meta.url).href;
         
-      logModelLoading({ 
+      logger.debug({ 
         modelUrl, 
         path, 
         msg: "Attempting to load model" 
-      });
+      }, "🔍 Trying model path");
       
       const model = await tf.loadGraphModel(modelUrl);
       
-      logger.info({ 
+      logSuccess(
+        `Model loaded successfully from: ${path}\n` +
+        `Input Shape: ${model.inputs[0].shape}\n` +
+        `Output Shape: ${model.outputs[0].shape}`,
+        "MODEL LOADED"
+      );
+      
+      logger.debug({ 
         inputShape: model.inputs[0].shape,
         inputDType: model.inputs[0].dtype,
         outputShape: model.outputs[0].shape,
-        modelVersion: model.version,
+        modelVersion: model.modelVersion,
         successPath: path
-      }, "✅ Model loaded successfully");
+      }, "✅ Model loaded with details");
       
       return model;
     } catch (error) {
       lastError = error;
-      logger.warn(
+      logger.debug(
         { 
           path, 
           errorMessage: getErrorMessage(error) 
         }, 
-        "Failed to load model from path"
+        "🔍 Failed to load model from path"
       );
     }
   }
   
   // If we get here, all paths failed
-  logError("Model Loading", lastError);
+  logError(
+    `Failed to load the YAMNet model from any location.\nLast error: ${getErrorMessage(lastError)}`,
+    "MODEL LOADING FAILED"
+  );
   throw new Error(`Model loading failed: ${lastError}`);
 }
 
@@ -73,10 +83,11 @@ async function classifyAudio(
     
     // Check if we have enough audio data
     if (audioChunk.length < config.sampleRate * 0.5) {
-      logAudioPreprocess({ 
+      logger.debug({ 
         chunkSize: audioChunk.length, 
         msg: "Audio chunk too small, skipping" 
-      });
+      }, "🔍 Insufficient audio data");
+      
       return {
         isDetected: false,
         confidence: 0,
@@ -88,7 +99,7 @@ async function classifyAudio(
     // Preprocess audio
     const inputTensorData = preprocessAudio(audioChunk, config);
     if (inputTensorData.length === 0) {
-      logger.warn("Preprocessed audio data is empty");
+      logger.warn("❓ Preprocessed audio data is empty");
       return {
         isDetected: false,
         confidence: 0,
@@ -100,25 +111,25 @@ async function classifyAudio(
     // Create input tensor with the right shape
     const inputTensor = tf.tensor1d(inputTensorData);
     
-    logAudioPreprocess({ 
+    logger.debug({ 
       shape: inputTensor.shape,
       dtype: inputTensor.dtype,
       min: tf.min(inputTensor).dataSync()[0],
       max: tf.max(inputTensor).dataSync()[0],
       msg: "Created input tensor" 
-    });
+    }, "🧮 Input tensor created");
 
     // Execute model prediction
     let predictions;
     try {
       predictions = model.predict(inputTensor) as tf.Tensor;
-      logger.debug("Model.predict succeeded");
+      logger.debug("🔮 Model prediction successful");
     } catch (predictionError) {
       logger.error({ 
         error: predictionError,
         inputShape: inputTensor.shape,
         modelInputShape: model.inputs[0].shape
-      }, "Error during model.predict");
+      }, "🚨 Error during model.predict");
       inputTensor.dispose();
       throw predictionError;
     }
@@ -139,7 +150,7 @@ async function classifyAudio(
       predictionShape: predictions.shape,
       probabilitiesLength: probabilities.length,
       samplePredictions: probabilities.slice(0, 5)
-    }, "Prediction details");
+    }, "🔍 Prediction details");
 
     // Clean up tensors
     inputTensor.dispose();
@@ -153,7 +164,7 @@ async function classifyAudio(
       logger.warn({
         probLength: probabilities.length,
         labelsLength: config.labels.length
-      }, "Prediction dimensions don't match label count");
+      }, "⚠️ Prediction dimensions don't match label count");
     }
 
     // Find the most likely class
@@ -171,14 +182,14 @@ async function classifyAudio(
 
     // Log top detected classes
     const topClasses = getTopClasses(probabilities, config.labels, 3);
-    logClassification({ 
+    logger.debug({ 
       label, 
-      confidence, 
+      confidence: confidence.toFixed(4), 
       maxIndex,
       isDetected,
       isKnown,
       topClasses 
-    });
+    }, `🏷️ Classification result: ${label} (${(confidence * 100).toFixed(1)}%)`);
 
     return {
       isDetected,
@@ -187,7 +198,7 @@ async function classifyAudio(
       isKnown,
     };
   } catch (error) {
-    logError("Audio Classification", error);
+    logger.error({ error }, "🚨 Audio classification error");
     return {
       isDetected: false,
       confidence: 0,
@@ -227,15 +238,15 @@ function preprocessAudio(
     const numSamples = Math.floor(audioChunk.length / 2); // 16-bit audio = 2 bytes per sample
     
     if (numSamples <= 0) {
-      logger.warn("No audio samples to process");
+      logger.warn("⚠️ No audio samples to process");
       return new Float32Array(0);
     }
     
-    logAudioPreprocess({ 
+    logger.debug({ 
       numSamples, 
       bufferSize: buffer.byteLength, 
       msg: "Processing PCM samples" 
-    });
+    }, "🎵 Converting PCM audio");
     
     // Convert Int16 PCM to Float32 with proper range for YAMNet
     const floatArray = new Float32Array(numSamples);
@@ -245,7 +256,7 @@ function preprocessAudio(
         const int16 = dataView.getInt16(i * 2, true); // true = little endian
         floatArray[i] = int16 / 32768.0; // Normalize to [-1, 1]
       } catch (e) {
-        logger.error({ position: i, maxLength: dataView.byteLength }, "Error reading sample");
+        logger.error({ position: i, maxLength: dataView.byteLength }, "🚨 Error reading audio sample");
         // Fill remaining with zeros if we hit an error
         for (let j = i; j < numSamples; j++) {
           floatArray[j] = 0;
@@ -279,27 +290,29 @@ function preprocessAudio(
         variance /= floatArray.length;
         const stdDev = Math.sqrt(variance);
         
-        logAudioPreprocess({
-          min, max, mean, 
-          stdDev,
+        logger.debug({
+          min: min.toFixed(4), 
+          max: max.toFixed(4), 
+          mean: mean.toFixed(4), 
+          stdDev: stdDev.toFixed(4),
           zeroCrossings: countZeroCrossings(floatArray),
           samples: floatArray.length,
           msg: "Audio signal statistics"
-        });
+        }, "📊 Audio waveform analysis");
       } catch (statError) {
-        logger.error({ error: statError }, "Error calculating signal statistics");
+        logger.error({ error: statError }, "🚨 Error calculating signal statistics");
       }
     }
 
     // Calculate expected samples based on the frame duration
     const expectedSamples = Math.floor(config.sampleRate * config.frameDuration);
     
-    logAudioPreprocess({
+    logger.debug({
       actualSamples: floatArray.length,
       expectedSamples: expectedSamples, 
-      duration: floatArray.length / config.sampleRate,
+      duration: (floatArray.length / config.sampleRate).toFixed(3),
       msg: "Sample count comparison"
-    });
+    }, "📏 Checking audio length requirements");
     
     let result: Float32Array;
 
@@ -308,33 +321,33 @@ function preprocessAudio(
       // Zero-pad if we have fewer samples than needed
       result = new Float32Array(expectedSamples);
       result.set(floatArray);
-      logAudioPreprocess({
+      logger.debug({
         original: floatArray.length,
         padded: result.length,
-        durationS: result.length / config.sampleRate,
+        durationS: (result.length / config.sampleRate).toFixed(3),
         msg: "Zero-padded audio data"
-      });
+      }, "➕ Zero-padding short audio");
     } else if (floatArray.length > expectedSamples) {
       // Truncate if we have more samples than needed
       result = floatArray.slice(0, expectedSamples);
-      logAudioPreprocess({
+      logger.debug({
         original: floatArray.length,
         truncated: result.length,
-        durationS: result.length / config.sampleRate,
+        durationS: (result.length / config.sampleRate).toFixed(3),
         msg: "Truncated audio data"
-      });
+      }, "✂️ Truncating long audio");
     } else {
       result = floatArray;
-      logAudioPreprocess({ 
+      logger.debug({ 
         samples: floatArray.length,
-        durationS: floatArray.length / config.sampleRate,
+        durationS: (floatArray.length / config.sampleRate).toFixed(3),
         msg: "Audio data already at target size"
-      });
+      }, "✅ Audio data at perfect size");
     }
 
     return result;
   } catch (error) {
-    logError("Audio Preprocessing", error);
+    logger.error({ error }, "🚨 Audio preprocessing error");
     return new Float32Array(0);
   }
 }

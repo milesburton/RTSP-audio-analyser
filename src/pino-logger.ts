@@ -1,5 +1,4 @@
-import pino from "https://esm.sh/pino@8.15.6";
-import pinoPretty from "https://esm.sh/pino-pretty@10.2.0";
+import { pino, pinoPretty } from "./deps.ts";
 import { getErrorMessage } from "./error-utils.ts";
 
 // Deno-specific environment variable retrieval
@@ -16,114 +15,137 @@ const logLevel: ValidLevel = (validLevels.includes(rawLogLevel as ValidLevel)
   ? rawLogLevel 
   : 'info') as ValidLevel;
 
-// Create a base logger with human-friendly pretty printing
-const baseLogger = pino(
-  {
-    level: logLevel,
-    formatters: {
-      level(label, number) {
-        return { level: number };
-      }
-    },
-    timestamp: pino.stdTimeFunctions.isoTime
-  },
-  pinoPretty({
-    colorize: true,
-    translateTime: 'SYS:standard',
-    singleLine: false,
-    ignore: 'pid,hostname,time,level',
-    customColors: 'debug:blue,info:green,warn:yellow,error:red,fatal:magenta',
-    messageFormat: (log, messageKey) => {
-      // Remove emoji from message to prevent duplication
-      const msg = log[messageKey] as string;
-      const cleanMsg = msg.replace(/^(🔍|ℹ️|⚠️|🚨|💥)\s*/, '');
-      return cleanMsg;
-    }
-  })
-);
-
-// Log the current log level using Pino
-baseLogger.info(`📊 [LOGGER] Log level set to: ${logLevel.toUpperCase()}`);
-
-// Create a wrapper logger that adds emoji support while maintaining Pino.Logger interface
-const logger: pino.Logger = {
-  trace: (objOrMsg: LogObject | LogMessage, msg?: LogMessage) => {
-    if (logLevel === 'trace') {
-      if (typeof objOrMsg === 'string') {
-        baseLogger.trace(`🔬 ${objOrMsg}`);
-      } else {
-        baseLogger.trace(objOrMsg, `🔬 ${msg || 'Trace information'}`);
-      }
-    }
-  },
+// Emoji categories for different types of logs
+export const emojis = {
+  // System status emojis
+  startup: "🚀",
+  success: "✅",
+  ready: "✨",
+  running: "🏃",
+  stopped: "🛑",
   
-  debug: (objOrMsg: LogObject | LogMessage, msg?: LogMessage) => {
-    if (logLevel === 'debug') {
-      if (typeof objOrMsg === 'string') {
-        baseLogger.debug(`🔍 ${objOrMsg}`);
-      } else {
-        baseLogger.debug(objOrMsg, `🔍 ${msg || 'Debug information'}`);
-      }
-    }
-  },
+  // Informational emojis  
+  info: "ℹ️",
+  debug: "🔍",
+  trace: "🔬",
+  detail: "🔎",
+  stats: "📊",
   
-  info: (objOrMsg: LogObject | LogMessage, msg?: LogMessage) => {
-    if (typeof objOrMsg === 'string') {
-      baseLogger.info(`ℹ️ ${objOrMsg}`);
-    } else {
-      baseLogger.info(objOrMsg, `ℹ️ ${msg || 'Information'}`);
-    }
-  },
+  // Warning and error emojis
+  warning: "⚠️",
+  error: "🚨",
+  fatal: "💥",
+  critical: "❌",
   
-  warn: (objOrMsg: LogObject | LogMessage, msg?: LogMessage) => {
-    if (typeof objOrMsg === 'string') {
-      baseLogger.warn(`⚠️ ${objOrMsg}`);
-    } else {
-      baseLogger.warn(objOrMsg, `⚠️ ${msg || 'Warning'}`);
-    }
-  },
+  // Process emojis
+  process: "⚙️",
+  analyzing: "🧮",
+  loading: "📂",
+  saving: "💾",
   
-  error: (objOrMsg: LogObject | LogMessage, msg?: MaybeError) => {
-    if (typeof objOrMsg === 'string') {
-      baseLogger.error(`🚨 ${objOrMsg}`);
-    } else {
-      const errorMsg = typeof msg === 'string' 
-        ? msg 
-        : msg ? getErrorMessage(msg) : 'Error occurred';
-      
-      baseLogger.error(objOrMsg, `🚨 ${errorMsg}`);
-    }
-  },
+  // Audio related emojis
+  audio: "🎵",
+  sound: "🔊",
+  listening: "👂",
+  detection: "🎯",
   
-  fatal: (objOrMsg: LogObject | LogMessage, msg?: MaybeError) => {
-    if (typeof objOrMsg === 'string') {
-      baseLogger.fatal(`💥 ${objOrMsg}`);
-    } else {
-      const errorMsg = typeof msg === 'string' 
-        ? msg 
-        : msg ? getErrorMessage(msg) : 'Fatal error';
-      
-      baseLogger.fatal(objOrMsg, `💥 ${errorMsg}`);
-    }
-  },
-
-  // Delegate other Pino.Logger methods to baseLogger
-  level: baseLogger.level,
-  silent: baseLogger.silent,
+  // Hardware/resource emojis
+  memory: "💾",
+  cpu: "⚡",
+  network: "🌐",
+  database: "🗄️",
   
-  child: (bindings) => baseLogger.child(bindings),
-  bindings: (props) => baseLogger.bindings(props),
-  isLevelEnabled: (level) => baseLogger.isLevelEnabled(level),
+  // Misc emojis
+  time: "⏱️",
+  config: "🔧",
+  data: "📄",
+  model: "🧠",
 };
 
-// Define types
-type LogObject = Record<string, unknown>;
-type LogMessage = string;
-type MaybeError = string | Error | undefined;
+// Create a pretty stream for formatting
+const prettyStream = pinoPretty({
+  colorize: true,
+  translateTime: 'SYS:standard',
+  singleLine: false,
+  ignore: 'pid,hostname,time,level',
+  customColors: 'debug:blue,info:green,warn:yellow,error:red,fatal:magenta',
+  messageFormat: (log, messageKey) => {
+    // Remove emoji from message to prevent duplication
+    const msg = log[messageKey] as string;
+    if (typeof msg === 'string') {
+      const cleanMsg = msg.replace(/^([\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}]+\s*)/u, '');
+      return cleanMsg;
+    }
+    return msg;
+  }
+});
+
+// Create a base logger with human-friendly pretty printing
+const baseLogger = pino({
+  level: logLevel,
+  formatters: {
+    level(label) {
+      return { level: label };
+    }
+  },
+  timestamp: pino.stdTimeFunctions.isoTime
+}, prettyStream);
+
+// Log the current log level
+baseLogger.info(`${emojis.config} [LOGGER] Log level set to: ${logLevel.toUpperCase()}`);
+
+// Helper functions to add emojis to log messages
+export function logDebug(obj: Record<string, unknown> | string, msg?: string): void {
+  if (typeof obj === 'string') {
+    baseLogger.debug(`${emojis.debug} ${obj}`);
+  } else {
+    baseLogger.debug(obj, `${emojis.debug} ${msg || 'Debug information'}`);
+  }
+}
+
+export function logInfo(obj: Record<string, unknown> | string, msg?: string): void {
+  if (typeof obj === 'string') {
+    baseLogger.info(`${emojis.info} ${obj}`);
+  } else {
+    baseLogger.info(obj, `${emojis.info} ${msg || 'Information'}`);
+  }
+}
+
+export function logWarn(obj: Record<string, unknown> | string, msg?: string): void {
+  if (typeof obj === 'string') {
+    baseLogger.warn(`${emojis.warning} ${obj}`);
+  } else {
+    baseLogger.warn(obj, `${emojis.warning} ${msg || 'Warning'}`);
+  }
+}
+
+export function logError(obj: Record<string, unknown> | string, msg?: string | Error | unknown): void {
+  if (typeof obj === 'string') {
+    baseLogger.error(`${emojis.error} ${obj}`);
+  } else {
+    const errorMsg = typeof msg === 'string' 
+      ? msg 
+      : msg ? getErrorMessage(msg) : 'Error occurred';
+    
+    baseLogger.error(obj, `${emojis.error} ${errorMsg}`);
+  }
+}
+
+export function logFatal(obj: Record<string, unknown> | string, msg?: string | Error | unknown): void {
+  if (typeof obj === 'string') {
+    baseLogger.fatal(`${emojis.fatal} ${obj}`);
+  } else {
+    const errorMsg = typeof msg === 'string' 
+      ? msg 
+      : msg ? getErrorMessage(msg) : 'Fatal error';
+    
+    baseLogger.fatal(obj, `${emojis.fatal} ${errorMsg}`);
+  }
+}
 
 // Specialized logging functions
-export const logAudioPreprocess = (_details: LogObject) => {
-  const msg = _details.msg as string;
+export function logAudioPreprocess(details: Record<string, unknown>): void {
+  const msg = details.msg as string;
   const detailedMsgs: Record<string, string> = {
     'Audio signal statistics': 'Analyzing audio signal characteristics',
     'Sample count comparison': 'Verifying audio sample count',
@@ -133,54 +155,65 @@ export const logAudioPreprocess = (_details: LogObject) => {
   };
 
   // Only log debug messages if debug level is active
-  if (logLevel === 'debug') {
-    logger.debug(_details, detailedMsgs[msg] || msg || 'Audio preprocessing step');
+  if (baseLogger.isLevelEnabled('debug')) {
+    logDebug(details, detailedMsgs[msg] || msg || 'Audio preprocessing step');
   }
-};
+}
 
-export const logModelLoading = (_details: LogObject) => {
-  logger.info(_details, `Model Loading: ${_details.modelUrl || 'Attempting to load model'}`);
-};
+export function logModelLoading(details: Record<string, unknown>): void {
+  logInfo(details, `${emojis.loading} Model Loading: ${details.modelUrl || 'Attempting to load model'}`);
+}
 
-export const logClassification = (_details: LogObject) => {
+export function logClassification(details: Record<string, unknown>): void {
   // Only log debug messages if debug level is active
-  if (logLevel === 'debug') {
-    const topClasses = _details.topClasses 
-      ? (_details.topClasses as Array<{label: string, confidence: number}>)
+  if (baseLogger.isLevelEnabled('debug')) {
+    const topClasses = details.topClasses 
+      ? (details.topClasses as Array<{label: string, confidence: number}>)
           .map(c => `${c.label} (${(c.confidence * 100).toFixed(2)}%)`) 
       : [];
     
-    logger.debug(
-      { ..._details, topClassesFormatted: topClasses }, 
-      `Classification Result: ${_details.label || 'Unknown'} (${(_details.confidence as number * 100).toFixed(2)}%)`
+    logDebug(
+      { ...details, topClassesFormatted: topClasses }, 
+      `${emojis.detection} Classification Result: ${details.label || 'Unknown'} (${(details.confidence as number * 100).toFixed(2)}%)`
     );
   }
-};
+}
 
-export const logError = (_context: string, error: unknown) => {
-  logger.error(
+export function logErrorContext(context: string, error: unknown): void {
+  logError(
     { 
-      context: _context, 
+      context, 
       errorMessage: getErrorMessage(error) 
     }, 
-    `Error in ${_context}`
+    `Error in ${context}`
   );
-};
+}
 
 // Configuration function
 export function configureLogging() {
-  logger.info(`📊 Current log level: ${logLevel.toUpperCase()}`);
-  logger.info(`📋 Available log levels: ${validLevels.join(', ')}`);
+  logInfo(`${emojis.config} Current log level: ${logLevel.toUpperCase()}`);
+  logInfo(`${emojis.info} Available log levels: ${validLevels.join(', ')}`);
   
   return {
     currentLevel: logLevel,
     printLogLevelInstructions: () => {
-      logger.info('🛠️ To change log level, set LOG_LEVEL environment variable:');
+      logInfo(`${emojis.config} To change log level, set LOG_LEVEL environment variable:`);
       validLevels.forEach(level => {
-        logger.info(`  🔧 export LOG_LEVEL=${level.toUpperCase()}  # ${level === 'info' ? 'Default level' : 'Set to ' + level} logs`);
+        logInfo(`  ${emojis.config} export LOG_LEVEL=${level.toUpperCase()}  # ${level === 'info' ? 'Default level' : 'Set to ' + level} logs`);
       });
-    }
+    },
+    emojis
   };
 }
 
-export default logger;
+// Export a simplified interface that other files can use
+export default {
+  trace: baseLogger.trace.bind(baseLogger),
+  debug: logDebug,
+  info: logInfo,
+  warn: logWarn,
+  error: logError,
+  fatal: logFatal,
+  isLevelEnabled: baseLogger.isLevelEnabled.bind(baseLogger),
+  level: baseLogger.level
+};

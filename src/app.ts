@@ -3,20 +3,40 @@ import logger from "./pino-logger.ts";
 import { loadModel } from "./model.ts";
 import { processStream } from "./stream-processor.ts";
 import { loadConfig } from "./config.ts";
+import { logStartup, logError } from "./boxen-logger.ts";
 
 // Main application function
 async function main() {
+  // Log startup information in a box
+  logStartup(
+    "Audio Event Detector",
+    "1.0.0",
+    "A clever audio detection system using TensorFlow.js and YAMNet"
+  );
+
   // Load configuration
   const config = await loadConfig();
  
   if (!config.rtsp.url) {
-    logger.fatal("🚫 RTSP stream URL is not defined in configuration");
+    logError(
+      "RTSP stream URL is not defined in configuration.\nPlease set RTSP_STREAM in your .env file.",
+      "CONFIGURATION ERROR"
+    );
     Deno.exit(1);
   }
 
   // Ensure TensorFlow is ready
-  await tfReady();
-  logger.info("✅ TensorFlow.js is ready");
+  try {
+    await tfReady();
+    logger.info("✅ TensorFlow.js is ready");
+  } catch (error) {
+    logError(
+      "Failed to initialize TensorFlow.js.\nPlease check your installation.",
+      "TENSORFLOW ERROR"
+    );
+    logger.debug({ error }, "🔍 Detailed TensorFlow initialization error");
+    Deno.exit(1);
+  }
 
   // Configuration for the YAMNet model
   const modelConfig = {
@@ -45,19 +65,31 @@ async function main() {
    
     await processStream(model, config.rtsp.url, modelConfig, logger);
   } catch (error) {
-    logger.fatal({ error }, "🔥 Fatal error");
+    logError(
+      `Fatal application error:\n${error instanceof Error ? error.message : String(error)}`,
+      "APPLICATION CRASH"
+    );
+    logger.debug({ error }, "🔬 Detailed error information");
     Deno.exit(1);
   }
 }
 
 // Handle uncaught errors
 globalThis.addEventListener("unhandledrejection", (event) => {
-  logger.fatal({ reason: event.reason }, "💥 Unhandled Rejection");
+  logError(
+    `Unhandled promise rejection: ${event.reason}`,
+    "RUNTIME ERROR"
+  );
+  logger.debug({ reason: event.reason }, "🔬 Unhandled Rejection Details");
   Deno.exit(1);
 });
 
 globalThis.addEventListener("error", (event) => {
-  logger.fatal({ error: event.error }, "💥 Uncaught Exception");
+  logError(
+    `Uncaught exception: ${event.error}`,
+    "RUNTIME ERROR"
+  );
+  logger.debug({ error: event.error }, "🔬 Uncaught Exception Details");
   Deno.exit(1);
 });
 

@@ -1,5 +1,7 @@
-import { load } from "https://deno.land/std@0.217.0/dotenv/mod.ts";
 import { EnvConfig } from "./types.ts";
+import logger, { emojis } from "./pino-logger.ts";
+import { processConfiguration } from "./config-logger.ts";
+import { load } from "./deps.ts";
 
 /**
  * Application configuration
@@ -91,34 +93,51 @@ const defaultConfig: AppConfig = {
  * Load configuration from environment
  */
 export async function loadConfig(): Promise<AppConfig> {
-  // Load environment variables
-  const env = (await load()) as unknown as EnvConfig;
+  logger.debug(`${emojis.config} Loading configuration from .env file`);
   
-  // Create a copy of the default config
-  const config = structuredClone(defaultConfig);
-  
-  // Override with environment variables if they exist
-  if (env.RTSP_STREAM) {
-    config.rtsp.url = env.RTSP_STREAM;
+  try {
+    // Load environment variables
+    const env = (await load()) as unknown as EnvConfig;
+    logger.debug(`${emojis.config} .env file loaded successfully`);
+    
+    // Create a copy of the default config
+    const config = structuredClone(defaultConfig);
+    
+    // Override with environment variables if they exist
+    if (env.RTSP_STREAM) {
+      config.rtsp.url = env.RTSP_STREAM;
+      logger.debug(`${emojis.config} RTSP stream URL set from .env`);
+    }
+    
+    if (env.LOG_LEVEL) {
+      config.logging.level = env.LOG_LEVEL;
+      logger.debug(`${emojis.config} Log level set to ${env.LOG_LEVEL} from .env`);
+    }
+    
+    if (env.MODEL_PATH) {
+      config.model.path = env.MODEL_PATH;
+      logger.debug(`${emojis.config} Model path set from .env`);
+    }
+    
+    if (env.CONFIDENCE_THRESHOLD) {
+      config.model.confidenceThreshold = parseFloat(env.CONFIDENCE_THRESHOLD);
+      logger.debug(`${emojis.config} Confidence threshold set to ${env.CONFIDENCE_THRESHOLD} from .env`);
+    }
+    
+    if (env.SAMPLE_RATE) {
+      config.audio.sampleRate = parseInt(env.SAMPLE_RATE);
+      logger.debug(`${emojis.config} Sample rate set to ${env.SAMPLE_RATE} from .env`);
+    }
+    
+    // Process and validate the configuration
+    processConfiguration(config, defaultConfig);
+    
+    return config;
+  } catch (error) {
+    logger.warn(
+      { error }, 
+      `${emojis.warning} Error loading .env file, using default configuration`
+    );
+    return defaultConfig;
   }
-  
-  if (env.LOG_LEVEL) {
-    config.logging.level = env.LOG_LEVEL;
-  }
-  
-  if (env.MODEL_PATH) {
-    config.model.path = env.MODEL_PATH;
-  }
-  
-  if (env.CONFIDENCE_THRESHOLD) {
-    config.model.confidenceThreshold = parseFloat(env.CONFIDENCE_THRESHOLD);
-  }
-  
-  if (env.SAMPLE_RATE) {
-    config.audio.sampleRate = parseInt(env.SAMPLE_RATE);
-  }
-  
-  // Add additional environment variable overrides as needed
-  
-  return config;
 }

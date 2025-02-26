@@ -1,10 +1,10 @@
-import { tf } from "./deps.ts";
+import { Logger, tf } from "./deps.ts";
 import { ModelConfig } from "./types.ts";
 import { classifyAudio } from "./model.ts";
 import { sanitiseRtspUrl } from "./url-sanitiser.ts";
 import { getEmojiForLabel } from "./emoji-mappings.ts";
 import { loadConfig } from "./config.ts";
-import type { Logger } from "https://esm.sh/pino@8.15.6?bundle";
+
 
 export async function processStream(
   model: tf.GraphModel,

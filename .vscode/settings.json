@@ -10,6 +10,8 @@
         "sanitiser",
         "sanitising",
         "tensorflowjs",
+        "tfjs",
+        "yamnet",
         "yzhang"
     ]
 }
