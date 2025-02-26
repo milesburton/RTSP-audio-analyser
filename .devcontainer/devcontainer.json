@@ -25,11 +25,11 @@
         "dbaeumer.vscode-eslint",
         "skyapps.fish-vscode",
         "redhat.vscode-yaml",
-        "yzhang.markdown-all-in-one"
+        "yzhang.markdown-all-in-one",
+        "streetsidesoftware.code-spell-checker"
       ]
     }
   },
-  "postCreateCommand": "deno run --allow-env --allow-run --allow-net --allow-read --allow-write src/app.ts",
   "mounts": [
     {
       "source": "${localEnv:HOME}/.ssh",

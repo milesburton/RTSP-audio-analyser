@@ -6,7 +6,6 @@ services:
       - detections_volume:/app/logs
     environment:
       - RTSP_STREAM=${RTSP_STREAM}
-      - DETECTION_TYPE=${DETECTION_TYPE}
 volumes:
   detections_volume:
 

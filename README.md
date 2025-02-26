@@ -1,8 +1,10 @@
 # 🎧 Deno Audio Event Detector
 
-🐕 A smart audio detection system built with Deno, TypeScript, and TensorFlow.js. While initially designed for detecting dog barks, this flexible system can be extended to detect various audio events like bird calls 🐦 or other sounds.
+⚠️ Experimental - Work in Progress
 
-This project leverages remote imports for hassle-free dependency management and uses FFmpeg to process RTSP streams, logging detection events with precise timestamps.
+🐕 A clever audio detection system built with Deno, TypeScript, and TensorFlow.js. Whilst initially designed for detecting dog barks, this flexible system can be extended to detect various audio events such as bird calls 🐦 or other sounds.
+
+This project leverages remote imports for hassle-free dependency management and utilises FFmpeg to process RTSP streams, logging detection events with precise timestamps.
 
 ## ✨ Features
 
@@ -10,7 +12,7 @@ This project leverages remote imports for hassle-free dependency management and 
   Seamlessly captures audio from CCTV cameras using FFmpeg.
   
 - 🔍 **Generic Audio Event Detection:**  
-  Utilizes TensorFlow.js for audio event detection, currently configured for dog bark detection using threshold-based analysis.
+  Utilises TensorFlow.js for audio event detection, currently configured for dog bark detection using threshold-based analysis.
   
 - 📝 **Event Logging:**  
   Automatically logs detections with timestamps to `logs/detections.log`.
