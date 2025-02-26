@@ -49,7 +49,7 @@ RUN mkdir -p /workspaces/audio-signal-analyser/yamnet_conversion && \
 
 # Set up fish configuration
 RUN mkdir -p /home/deno/.config/fish && \
-    echo 'alias runapp="deno run --allow-env --allow-run --allow-net --allow-read --allow-sys --allow-write src/app.ts"' > /home/deno/.config/fish/config.fish && \
+    echo 'alias runapp="deno run --allow-env --allow-run --allow-net --allow-read --allow-sys --inspect --allow-write src/app.ts"' > /home/deno/.config/fish/config.fish && \
     echo 'set fish_greeting ""' >> /home/deno/.config/fish/config.fish && \
     echo 'echo "Welcome to the Audio Signal Analyser container!" | lolcat' >> /home/deno/.config/fish/config.fish && \
     echo 'echo "To run the application, type: runapp" | lolcat' >> /home/deno/.config/fish/config.fish && \

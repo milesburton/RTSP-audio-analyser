@@ -1,3 +1,5 @@
+import logger from "./pino-logger.ts";
+
 /**
  * Sanitises an RTSP URL by removing sensitive information
  * @param rtspUrl The original RTSP URL
@@ -60,7 +62,7 @@ export function sanitiseRtspUrl(rtspUrl: string): string {
         return sanitisedUrl;
     } catch (error) {
         // Return a safe fallback if anything goes wrong
-        console.error('Error sanitising RTSP URL:', error);
+        logger.warn('Error sanitising RTSP URL:', error);
         return 'rtsp://[error-sanitising-url]';
     }
 }

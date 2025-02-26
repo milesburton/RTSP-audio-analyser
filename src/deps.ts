@@ -1,8 +1,9 @@
-// deps.ts - Updated with more explicit imports and versions
 export { load } from "https://deno.land/std@0.217.0/dotenv/mod.ts";
 export { exists } from "https://deno.land/std@0.217.0/fs/exists.ts";
-
 export type { Logger } from "https://esm.sh/pino@8.15.6?bundle";
+
+// Zod validation library
+export { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 // TensorFlow.js imports
 import * as tf from "https://esm.sh/@tensorflow/tfjs@4.17.0";

@@ -1,13 +1,15 @@
 {
   "name": "Deno Audio Event Detector",
   "remoteUser": "deno",
+  "appPort": [9229],
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
   },
   "runArgs": [
     "--volume",
-    "detections_volume:/app/logs"
+    "detections_volume:/app/logs",
+    "--network", "host"
   ],
   "customizations": {
     "vscode": {

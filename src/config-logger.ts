@@ -2,12 +2,26 @@ import logger, { emojis } from "./pino-logger.ts";
 import { AppConfig } from "./config.ts";
 import { logInfo } from "./boxen-logger.ts";
 
+// Track whether configuration has been logged already
+let configurationLogged = false;
+
 /**
  * Utility to log configuration in a structured, redacted way
  * @param config The application configuration
  * @param source The source of the configuration (e.g., ".env file", "defaults")
+ * @param force Whether to force logging even if already logged once
  */
-export function logConfiguration(config: AppConfig, source: string = "configuration"): void {
+export function logConfiguration(
+  config: AppConfig, 
+  source: string = "configuration",
+  force: boolean = false
+): void {
+  // Skip if already logged unless forced
+  if (configurationLogged && !force) {
+    logger.debug(`${emojis.config} Configuration already logged, skipping redundant log`);
+    return;
+  }
+
   // Create a redacted copy of the config to avoid logging sensitive information
   const redactedConfig = structuredClone(config);
   
@@ -36,6 +50,9 @@ export function logConfiguration(config: AppConfig, source: string = "configurat
   
   // Log the full configuration at debug level for troubleshooting
   logger.debug({ config: redactedConfig }, "Full application configuration");
+  
+  // Mark as logged
+  configurationLogged = true;
 }
 
 /**
@@ -128,17 +145,26 @@ export function validateConfiguration(config: AppConfig): string[] {
 }
 
 /**
+ * Reset the configuration logged flag (useful for testing)
+ */
+export function resetConfigurationLoggedStatus(): void {
+  configurationLogged = false;
+}
+
+/**
  * All-in-one function to process and log configuration
  * @param config The current configuration
  * @param defaultConfig The default configuration
+ * @param force Whether to force logging even if already logged
  * @returns Whether the configuration is valid
  */
 export function processConfiguration(
   config: AppConfig, 
-  defaultConfig: AppConfig
+  defaultConfig: AppConfig,
+  force: boolean = false
 ): boolean {
-  // Log the configuration
-  logConfiguration(config);
+  // Log the configuration (only once unless forced)
+  logConfiguration(config, "configuration", force);
   
   // Log changes from defaults
   logConfigChanges(config, defaultConfig);
@@ -153,5 +179,6 @@ export default {
   logConfiguration,
   logConfigChanges,
   validateConfiguration,
-  processConfiguration
+  processConfiguration,
+  resetConfigurationLoggedStatus
 };

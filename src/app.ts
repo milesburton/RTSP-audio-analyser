@@ -7,6 +7,9 @@ import { logStartup, logError } from "./boxen-logger.ts";
 
 // Main application function
 async function main() {
+  // Load configuration
+  const config = await loadConfig();
+
   // Log startup information in a box
   logStartup(
     "Audio Event Detector",
@@ -14,9 +17,6 @@ async function main() {
     "A clever audio detection system using TensorFlow.js and YAMNet"
   );
 
-  // Load configuration
-  const config = await loadConfig();
- 
   if (!config.rtsp.url) {
     logError(
       "RTSP stream URL is not defined in configuration.\nPlease set RTSP_STREAM in your .env file.",
@@ -24,7 +24,6 @@ async function main() {
     );
     Deno.exit(1);
   }
-
   // Ensure TensorFlow is ready
   try {
     await tfReady();
@@ -62,11 +61,13 @@ async function main() {
     logger.info("🔍 Loading YAMNet model...");
     const model = await loadModel(modelConfig);
     logger.info("✅ Model loaded successfully");
-   
+
     await processStream(model, config.rtsp.url, modelConfig, logger);
   } catch (error) {
     logError(
-      `Fatal application error:\n${error instanceof Error ? error.message : String(error)}`,
+      `Fatal application error:\n${
+        error instanceof Error ? error.message : String(error)
+      }`,
       "APPLICATION CRASH"
     );
     logger.debug({ error }, "🔬 Detailed error information");
@@ -76,22 +77,17 @@ async function main() {
 
 // Handle uncaught errors
 globalThis.addEventListener("unhandledrejection", (event) => {
-  logError(
-    `Unhandled promise rejection: ${event.reason}`,
-    "RUNTIME ERROR"
-  );
+  logError(`Unhandled promise rejection: ${event.reason}`, "RUNTIME ERROR");
   logger.debug({ reason: event.reason }, "🔬 Unhandled Rejection Details");
   Deno.exit(1);
 });
 
 globalThis.addEventListener("error", (event) => {
-  logError(
-    `Uncaught exception: ${event.error}`,
-    "RUNTIME ERROR"
-  );
+  logError(`Uncaught exception: ${event.error}`, "RUNTIME ERROR");
   logger.debug({ error: event.error }, "🔬 Uncaught Exception Details");
   Deno.exit(1);
 });
 
 // Start the application
 await main();
+await new Promise(() => {});

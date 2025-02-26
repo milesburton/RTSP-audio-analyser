@@ -1,57 +1,81 @@
-import { EnvConfig } from "./types.ts";
+import { load, z } from "./deps.ts";
 import logger, { emojis } from "./pino-logger.ts";
 import { processConfiguration } from "./config-logger.ts";
-import { load } from "./deps.ts";
 
 /**
- * Application configuration
+ * Zod schema for validating environment configuration
+ * Uses coercion to handle type conversion and optional values
+ */
+const EnvConfigSchema = z.object({
+  // RTSP Configuration
+  RTSP_STREAM: z.string().optional(),
+
+  // Logging Configuration
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).optional(),
+
+  // Model Configuration
+  MODEL_PATH: z.string().optional(),
+  CONFIDENCE_THRESHOLD: z.coerce.number().optional(),
+  KNOWN_THRESHOLD: z.coerce.number().optional(),
+  LOG_THRESHOLD: z.coerce.number().optional(),
+
+  // Audio Configuration
+  SAMPLE_RATE: z.coerce.number().optional(),
+  FRAME_DURATION: z.coerce.number().optional(),
+  BUFFER_SIZE: z.coerce.number().optional(),
+  CHUNK_SIZE: z.coerce.number().optional(),
+  PROCESS_INTERVAL: z.coerce.number().optional(),
+
+  // Detection Configuration
+  PERSISTENCE_TIME: z.coerce.number().optional(),
+  INTERESTING_SOUNDS: z.string().optional(),
+  IGNORE_SOUNDS: z.string().optional(),
+});
+
+/**
+ * Application configuration interface
  */
 export interface AppConfig {
-  // Audio processing settings
   audio: {
-    sampleRate: number;       // Sample rate in Hz
-    frameDuration: number;    // Frame duration in seconds
-    bufferSize: number;       // Audio buffer size in KB
-    chunkSize: number;        // Minimum chunk size to process
-    processInterval: number;  // How often to process audio (ms)
+    sampleRate: number;
+    frameDuration: number;
+    bufferSize: number;
+    chunkSize: number;
+    processInterval: number;
   };
-  
-  // Model settings
+
   model: {
-    path: string;             // Path to the model file
-    confidenceThreshold: number; // Threshold for detection
-    knownThreshold: number;   // Threshold for known sounds
-    logThreshold: number;     // Threshold for logging
+    path: string;
+    confidenceThreshold: number;
+    knownThreshold: number;
+    logThreshold: number;
   };
-  
-  // Logging settings
+
   logging: {
-    level: string;            // Log level (debug, info, warn, error)
-    logInterval: number;      // How often to log stats (ms)
-    prettyPrint: boolean;     // Whether to use pretty printing
-    colorize: boolean;        // Whether to colorize logs
+    level: "debug" | "info" | "warn" | "error";
+    logInterval: number;
+    prettyPrint: boolean;
+    colorize: boolean;
   };
-  
-  // RTSP stream settings
+
   rtsp: {
-    url: string;              // RTSP stream URL
-    transport: string;        // RTSP transport (tcp, udp)
-    reconnect: boolean;       // Whether to reconnect on failure
-    reconnectDelay: number;   // Delay between reconnection attempts (s)
+    url: string;
+    transport: "tcp" | "udp";
+    reconnect: boolean;
+    reconnectDelay: number;
   };
-  
-  // Detection settings
+
   detection: {
-    persistenceTime: number;  // Time to wait before re-logging same sound (ms)
-    interestingSounds: string[]; // List of sounds to prioritize
-    ignoreSounds: string[];   // List of sounds to ignore
+    persistenceTime: number;
+    interestingSounds: string[];
+    ignoreSounds: string[];
   };
 }
 
 /**
- * Default configuration
+ * Default configuration with sensible defaults
  */
-const defaultConfig: AppConfig = {
+const DEFAULT_CONFIG: AppConfig = {
   audio: {
     sampleRate: 16000,
     frameDuration: 0.975,
@@ -80,64 +104,188 @@ const defaultConfig: AppConfig = {
   detection: {
     persistenceTime: 10000,
     interestingSounds: [
-      "Dog", "Bark", "Person", "Speech", "Alarm", "Siren", 
-      "Glass", "Shatter", "Gunshot, gunfire", "Explosion"
+      "Dog",
+      "Bark",
+      "Person",
+      "Speech",
+      "Alarm",
+      "Siren",
+      "Glass",
+      "Shatter",
+      "Gunshot, gunfire",
+      "Explosion",
     ],
-    ignoreSounds: [
-      "Silence", "Noise", "Static", "Environmental noise"
-    ],
+    ignoreSounds: ["Silence", "Noise", "Static", "Environmental noise"],
   },
 };
 
+// Cached configuration to prevent multiple loads
+let cachedConfig: AppConfig | null = null;
+
 /**
- * Load configuration from environment
+ * Parse comma-separated string into an array of trimmed, non-empty strings
+ */
+function parseCommaSeparatedString(value?: string): string[] {
+  return value
+    ? value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+}
+
+/**
+ * Load and validate configuration from environment variables
  */
 export async function loadConfig(): Promise<AppConfig> {
-  logger.debug(`${emojis.config} Loading configuration from .env file`);
-  
+  // Return cached config if already loaded
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  logger.debug(`${emojis.config} Loading configuration`);
+
   try {
     // Load environment variables
-    const env = (await load()) as unknown as EnvConfig;
-    logger.debug(`${emojis.config} .env file loaded successfully`);
-    
-    // Create a copy of the default config
-    const config = structuredClone(defaultConfig);
-    
-    // Override with environment variables if they exist
-    if (env.RTSP_STREAM) {
-      config.rtsp.url = env.RTSP_STREAM;
-      logger.debug(`${emojis.config} RTSP stream URL set from .env`);
+    const loadedEnv = await load();
+
+    // Validate environment configuration
+    const parsedEnv = EnvConfigSchema.parse(loadedEnv);
+
+    // Create a deep copy of the default config
+    const config: AppConfig = structuredClone(DEFAULT_CONFIG);
+
+    logger.error(`Using config: ${JSON.stringify(config, null, 2)}`);
+
+    // Helper function to update config with optional env vars
+    const updateIfPresent = <
+      K extends keyof AppConfig,
+      T extends keyof AppConfig[K]
+    >(
+      category: K,
+      key: T,
+      envValue: unknown,
+      logMessage: string
+    ) => {
+      if (envValue !== undefined) {
+        config[category][key] = envValue as AppConfig[K][T];
+        logger.debug(`${emojis.config} ${logMessage} from .env`);
+      }
+    };
+
+    // Update configuration with environment variables
+    updateIfPresent(
+      "rtsp",
+      "url",
+      parsedEnv.RTSP_STREAM,
+      "RTSP stream URL set"
+    );
+    updateIfPresent(
+      "logging",
+      "level",
+      parsedEnv.LOG_LEVEL,
+      `Log level set to ${parsedEnv.LOG_LEVEL}`
+    );
+    updateIfPresent("model", "path", parsedEnv.MODEL_PATH, "Model path set");
+
+    // Numeric configurations
+    updateIfPresent(
+      "model",
+      "confidenceThreshold",
+      parsedEnv.CONFIDENCE_THRESHOLD,
+      `Confidence threshold set to ${parsedEnv.CONFIDENCE_THRESHOLD}`
+    );
+    updateIfPresent(
+      "model",
+      "knownThreshold",
+      parsedEnv.KNOWN_THRESHOLD,
+      `Known threshold set to ${parsedEnv.KNOWN_THRESHOLD}`
+    );
+    updateIfPresent(
+      "model",
+      "logThreshold",
+      parsedEnv.LOG_THRESHOLD,
+      `Log threshold set to ${parsedEnv.LOG_THRESHOLD}`
+    );
+
+    // Audio configurations
+    updateIfPresent(
+      "audio",
+      "sampleRate",
+      parsedEnv.SAMPLE_RATE,
+      `Sample rate set to ${parsedEnv.SAMPLE_RATE}`
+    );
+    updateIfPresent(
+      "audio",
+      "frameDuration",
+      parsedEnv.FRAME_DURATION,
+      `Frame duration set to ${parsedEnv.FRAME_DURATION}`
+    );
+    updateIfPresent(
+      "audio",
+      "bufferSize",
+      parsedEnv.BUFFER_SIZE,
+      `Buffer size set to ${parsedEnv.BUFFER_SIZE}`
+    );
+    updateIfPresent(
+      "audio",
+      "chunkSize",
+      parsedEnv.CHUNK_SIZE,
+      `Chunk size set to ${parsedEnv.CHUNK_SIZE}`
+    );
+    updateIfPresent(
+      "audio",
+      "processInterval",
+      parsedEnv.PROCESS_INTERVAL,
+      `Process interval set to ${parsedEnv.PROCESS_INTERVAL}`
+    );
+
+    // Detection configurations
+    updateIfPresent(
+      "detection",
+      "persistenceTime",
+      parsedEnv.PERSISTENCE_TIME,
+      `Persistence time set to ${parsedEnv.PERSISTENCE_TIME}`
+    );
+
+    // Parse comma-separated sounds lists
+    if (parsedEnv.INTERESTING_SOUNDS) {
+      config.detection.interestingSounds = parseCommaSeparatedString(
+        parsedEnv.INTERESTING_SOUNDS
+      );
+      logger.debug(`${emojis.config} Interesting sounds updated from .env`);
     }
-    
-    if (env.LOG_LEVEL) {
-      config.logging.level = env.LOG_LEVEL;
-      logger.debug(`${emojis.config} Log level set to ${env.LOG_LEVEL} from .env`);
+
+    if (parsedEnv.IGNORE_SOUNDS) {
+      config.detection.ignoreSounds = parseCommaSeparatedString(
+        parsedEnv.IGNORE_SOUNDS
+      );
+      logger.debug(`${emojis.config} Ignored sounds updated from .env`);
     }
-    
-    if (env.MODEL_PATH) {
-      config.model.path = env.MODEL_PATH;
-      logger.debug(`${emojis.config} Model path set from .env`);
-    }
-    
-    if (env.CONFIDENCE_THRESHOLD) {
-      config.model.confidenceThreshold = parseFloat(env.CONFIDENCE_THRESHOLD);
-      logger.debug(`${emojis.config} Confidence threshold set to ${env.CONFIDENCE_THRESHOLD} from .env`);
-    }
-    
-    if (env.SAMPLE_RATE) {
-      config.audio.sampleRate = parseInt(env.SAMPLE_RATE);
-      logger.debug(`${emojis.config} Sample rate set to ${env.SAMPLE_RATE} from .env`);
-    }
-    
+
     // Process and validate the configuration
-    processConfiguration(config, defaultConfig);
-    
+    processConfiguration(config, DEFAULT_CONFIG);
+
+    // Cache the config
+    cachedConfig = config;
+
     return config;
   } catch (error) {
     logger.warn(
-      { error }, 
-      `${emojis.warning} Error loading .env file, using default configuration`
+      { error },
+      `${emojis.warning} Error loading configuration, using default configuration`
     );
-    return defaultConfig;
+
+    // Cache the default config
+    cachedConfig = DEFAULT_CONFIG;
+
+    return DEFAULT_CONFIG;
   }
+}
+
+/**
+ * Reset the cached configuration (primarily for testing purposes)
+ */
+export function resetConfig(): void {
+  cachedConfig = null;
 }

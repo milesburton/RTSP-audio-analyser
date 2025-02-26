@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Launch Deno App in Dev Container",
+        "type": "node",
+        "request": "launch",
+        "runtimeExecutable": "/home/deno/.deno/bin/deno",
+        "runtimeArgs": [
+          "run",
+          "--unstable",
+          "--inspect-brk",
+          "--allow-env",
+          "--allow-run",
+          "--allow-net",
+          "--allow-read",
+          "--allow-sys",
+          "--allow-write",
+          "src/app.ts"
+        ],
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Attach to Deno App in Dev Container",
+        "type": "node",
+        "request": "attach",
+        "port": 9229,
+        "address": "localhost",
+        "restart": false,
+        "skipFiles": ["<node_internals>/**"],
+        "timeout": 30000,
+        "localRoot": "${workspaceFolder}",
+        "remoteRoot": "/workspaces/your-container-folder"
+      }
+    ]
+  }
+  
