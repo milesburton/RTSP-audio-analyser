@@ -46,7 +46,7 @@ export function sanitiseRtspUrl(rtspUrl: string): string {
             // Remove any sensitive information from query parameters
             const sanitisedQuery = query.split('&')
                 .map(param => {
-                    const [key, value] = param.split('=');
+                    const [key ] = param.split('=');
                     const sensitiveParams = ['password', 'pass', 'pwd', 'token', 'auth', 'key'];
                     if (sensitiveParams.some(p => key.toLowerCase().includes(p))) {
                         return `${key}=[redacted]`;
